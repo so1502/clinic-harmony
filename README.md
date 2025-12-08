@@ -66,8 +66,3 @@ supabase/
 - Role-based access control via `user_roles` table
 - Multi-tenant data isolation by `clinic_id`
 - Secure authentication with Supabase Auth
-
-## 📚 Documentation
-
-- [Lovable Docs](https://docs.lovable.dev)
-- [Supabase Docs](https://supabase.com/docs)
