@@ -10,7 +10,7 @@ interface SeedUser {
   password: string;
   full_name: string;
   role: 'system_admin' | 'clinic_admin' | 'therapist' | 'receptionist';
-  clinic_index: number; // 0 or 1
+  clinic_index: number;
   is_therapist?: boolean;
   specialization?: string;
   color?: string;
@@ -62,30 +62,50 @@ Deno.serve(async (req) => {
 
     const results: string[] = [];
 
-    // Step 1: Create Clinics
+    // Step 1: Create Clinics (check if they exist first)
     console.log('Creating clinics...');
-    const { data: clinicsData, error: clinicsError } = await supabase
+    
+    // Check for existing clinics
+    const { data: existingClinics } = await supabase
       .from('clinics')
-      .upsert([
-        { name: 'Test Clinic 1', address: '100 Healthcare Blvd, Medical City, MC 12345', phone: '+1 555-1000', email: 'contact@testclinic1.com' },
-        { name: 'Test Clinic 2', address: '200 Wellness Ave, Health Town, HT 67890', phone: '+1 555-2000', email: 'contact@testclinic2.com' },
-      ], { onConflict: 'name', ignoreDuplicates: true })
-      .select();
-
-    if (clinicsError) {
-      // Try to fetch existing clinics
-      const { data: existingClinics } = await supabase.from('clinics').select('*').in('name', ['Test Clinic 1', 'Test Clinic 2']);
-      if (!existingClinics || existingClinics.length < 2) {
-        throw new Error(`Failed to create clinics: ${clinicsError.message}`);
+      .select('*')
+      .in('name', ['Test Clinic 1', 'Test Clinic 2']);
+    
+    let clinics = existingClinics || [];
+    
+    if (!clinics.find(c => c.name === 'Test Clinic 1')) {
+      const { data, error } = await supabase
+        .from('clinics')
+        .insert({ name: 'Test Clinic 1', address: '100 Healthcare Blvd, Medical City, MC 12345', phone: '+1 555-1000', email: 'contact@testclinic1.com' })
+        .select()
+        .single();
+      if (error) {
+        console.error('Error creating Test Clinic 1:', error);
+      } else if (data) {
+        clinics.push(data);
+      }
+    }
+    
+    if (!clinics.find(c => c.name === 'Test Clinic 2')) {
+      const { data, error } = await supabase
+        .from('clinics')
+        .insert({ name: 'Test Clinic 2', address: '200 Wellness Ave, Health Town, HT 67890', phone: '+1 555-2000', email: 'contact@testclinic2.com' })
+        .select()
+        .single();
+      if (error) {
+        console.error('Error creating Test Clinic 2:', error);
+      } else if (data) {
+        clinics.push(data);
       }
     }
 
-    // Get clinic IDs
-    const { data: clinics } = await supabase.from('clinics').select('*').in('name', ['Test Clinic 1', 'Test Clinic 2']).order('name');
-    if (!clinics || clinics.length < 2) {
-      throw new Error('Could not find or create clinics');
+    // Sort clinics by name to ensure consistent ordering
+    clinics = clinics.sort((a, b) => a.name.localeCompare(b.name));
+    
+    if (clinics.length < 2) {
+      throw new Error('Could not find or create both clinics');
     }
-    results.push(`✓ Clinics created/found: ${clinics.map(c => c.name).join(', ')}`);
+    results.push(`✓ Clinics ready: ${clinics.map(c => c.name).join(', ')}`);
 
     // Step 2: Create Users
     console.log('Creating users...');
@@ -126,10 +146,19 @@ Deno.serve(async (req) => {
         .update({ clinic_id: clinicId, full_name: user.full_name })
         .eq('id', userId);
 
-      // Assign role
-      await supabase
+      // Check if role already exists
+      const { data: existingRole } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: user.role }, { onConflict: 'user_id,role' });
+        .select('*')
+        .eq('user_id', userId)
+        .eq('role', user.role)
+        .maybeSingle();
+      
+      if (!existingRole) {
+        await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: user.role });
+      }
     }
 
     // Step 3: Create Therapist profiles
@@ -140,55 +169,101 @@ Deno.serve(async (req) => {
 
       const clinicId = clinics[user.clinic_index].id;
       
-      const { error } = await supabase
+      // Check if therapist profile exists
+      const { data: existingTherapist } = await supabase
         .from('therapists')
-        .upsert({
-          user_id: userId,
-          clinic_id: clinicId,
-          specialization: user.specialization,
-          bio: `Experienced ${user.specialization} specialist with over 10 years of practice.`,
-          color: user.color
-        }, { onConflict: 'user_id' });
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (!existingTherapist) {
+        const { error } = await supabase
+          .from('therapists')
+          .insert({
+            user_id: userId,
+            clinic_id: clinicId,
+            specialization: user.specialization,
+            bio: `Experienced ${user.specialization} specialist with over 10 years of practice.`,
+            color: user.color
+          });
 
-      if (error) {
-        results.push(`✗ Failed to create therapist profile for ${user.email}: ${error.message}`);
+        if (error) {
+          results.push(`✗ Failed to create therapist profile for ${user.email}: ${error.message}`);
+        } else {
+          results.push(`✓ Created therapist profile: ${user.full_name}`);
+        }
       } else {
-        results.push(`✓ Created therapist profile: ${user.full_name}`);
+        results.push(`✓ Therapist profile already exists: ${user.full_name}`);
       }
     }
 
     // Step 4: Create Patients (for Clinic 1)
     console.log('Creating patients...');
     const clinic1Id = clinics[0].id;
+    let patientsCreated = 0;
     
     for (const patient of PATIENTS) {
-      const { error } = await supabase
+      // Check if patient exists
+      const { data: existingPatient } = await supabase
         .from('patients')
-        .upsert({ ...patient, clinic_id: clinic1Id }, { onConflict: 'clinic_id,full_name', ignoreDuplicates: true });
+        .select('*')
+        .eq('clinic_id', clinic1Id)
+        .eq('full_name', patient.full_name)
+        .maybeSingle();
+      
+      if (!existingPatient) {
+        const { error } = await supabase
+          .from('patients')
+          .insert({ ...patient, clinic_id: clinic1Id });
 
-      if (error && !error.message.includes('duplicate')) {
-        results.push(`✗ Failed to create patient ${patient.full_name}: ${error.message}`);
+        if (error) {
+          console.error(`Failed to create patient ${patient.full_name}:`, error);
+        } else {
+          patientsCreated++;
+        }
       }
     }
-    results.push(`✓ Created ${PATIENTS.length} patients for Test Clinic 1`);
+    results.push(`✓ Patients ready for Test Clinic 1 (${patientsCreated} new)`);
 
     // Step 5: Create Therapy Types (for Clinic 1)
     console.log('Creating therapy types...');
+    let typesCreated = 0;
     for (const therapyType of THERAPY_TYPES) {
-      await supabase
+      const { data: existing } = await supabase
         .from('therapy_types')
-        .upsert({ ...therapyType, clinic_id: clinic1Id }, { onConflict: 'clinic_id,name', ignoreDuplicates: true });
+        .select('*')
+        .eq('clinic_id', clinic1Id)
+        .eq('name', therapyType.name)
+        .maybeSingle();
+      
+      if (!existing) {
+        await supabase
+          .from('therapy_types')
+          .insert({ ...therapyType, clinic_id: clinic1Id });
+        typesCreated++;
+      }
     }
-    results.push(`✓ Created ${THERAPY_TYPES.length} therapy types`);
+    results.push(`✓ Therapy types ready (${typesCreated} new)`);
 
     // Step 6: Create Rooms (for Clinic 1)
     console.log('Creating rooms...');
+    let roomsCreated = 0;
     for (const room of ROOMS) {
-      await supabase
+      const { data: existing } = await supabase
         .from('rooms')
-        .upsert({ ...room, clinic_id: clinic1Id }, { onConflict: 'clinic_id,name', ignoreDuplicates: true });
+        .select('*')
+        .eq('clinic_id', clinic1Id)
+        .eq('name', room.name)
+        .maybeSingle();
+      
+      if (!existing) {
+        await supabase
+          .from('rooms')
+          .insert({ ...room, clinic_id: clinic1Id });
+        roomsCreated++;
+      }
     }
-    results.push(`✓ Created ${ROOMS.length} rooms`);
+    results.push(`✓ Rooms ready (${roomsCreated} new)`);
 
     // Step 7: Create Sample Appointments
     console.log('Creating appointments...');
@@ -220,7 +295,13 @@ Deno.serve(async (req) => {
       .select('id, name')
       .eq('clinic_id', clinic1Id);
 
-    if (therapist && patients && patients.length > 0 && therapyTypes && rooms) {
+    // Check existing appointments count
+    const { count: existingAppts } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_id', clinic1Id);
+
+    if (therapist && patients && patients.length > 0 && therapyTypes && rooms && (!existingAppts || existingAppts < 5)) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(8, 0, 0, 0);
@@ -233,6 +314,7 @@ Deno.serve(async (req) => {
         { patientIndex: 4, hour: 15, therapyTypeIndex: 1, roomIndex: 0, dayOffset: 4, status: 'confirmed' as const },
       ];
 
+      let appointmentsCreated = 0;
       for (const apt of appointments) {
         const startTime = new Date(tomorrow);
         startTime.setDate(startTime.getDate() + apt.dayOffset - 1);
@@ -241,7 +323,7 @@ Deno.serve(async (req) => {
         const endTime = new Date(startTime);
         endTime.setMinutes(endTime.getMinutes() + (therapyTypes[apt.therapyTypeIndex]?.duration_minutes || 60));
 
-        await supabase.from('appointments').insert({
+        const { error } = await supabase.from('appointments').insert({
           clinic_id: clinic1Id,
           therapist_id: therapist.id,
           patient_id: patients[apt.patientIndex].id,
@@ -252,29 +334,15 @@ Deno.serve(async (req) => {
           status: apt.status,
           notes: `Sample appointment for ${patients[apt.patientIndex].full_name}`
         });
+        
+        if (!error) appointmentsCreated++;
       }
-      results.push(`✓ Created 5 sample appointments`);
+      results.push(`✓ Appointments ready (${appointmentsCreated} new)`);
+    } else {
+      results.push(`✓ Appointments already exist or prerequisites missing`);
     }
 
-    // Summary
-    const summary = `
-## Seed Data Complete!
-
-### Test Users (all passwords work):
-
-| Email | Password | Role |
-|-------|----------|------|
-| admin@example.com | Admin123! | System Admin |
-| clinic.admin@example.com | ClinicAdmin123! | Clinic Admin (Clinic 1) |
-| therapist.one@example.com | Therapist123! | Therapist (Clinic 1) |
-| receptionist@example.com | Reception123! | Receptionist (Clinic 1) |
-| therapist.two@example.com | Therapist2! | Therapist (Clinic 2) |
-
-### Results:
-${results.join('\n')}
-    `;
-
-    console.log(summary);
+    console.log('Seed complete!', results);
 
     return new Response(
       JSON.stringify({ 
