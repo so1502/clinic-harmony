@@ -13,6 +13,7 @@ import PatientsPage from "./pages/PatientsPage";
 import TherapistsPage from "./pages/TherapistsPage";
 import TherapyTypesPage from "./pages/TherapyTypesPage";
 import RoomsPage from "./pages/RoomsPage";
+import SeedPage from "./pages/SeedPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/seed" element={<SeedPage />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />

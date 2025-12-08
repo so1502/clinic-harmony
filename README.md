@@ -1,73 +1,73 @@
-# Welcome to your Lovable project
+# TherapyHub - Therapy Clinic Scheduling System
 
-## Project info
+A multi-tenant therapy clinic scheduling system with role-based access control.
 
-**URL**: https://lovable.dev/projects/41701f72-1b2e-4dee-a1f5-b4c7317f4bde
+## 🚀 Quick Start
 
-## How can I edit this code?
+### Seeding the Database
 
-There are several ways of editing your application.
+To populate the database with test data, visit:
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/41701f72-1b2e-4dee-a1f5-b4c7317f4bde) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+/seed
 ```
 
-**Edit a file directly in GitHub**
+Or click the "Run Seed Script" button on that page. This will create:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **2 Clinics**: Test Clinic 1 & Test Clinic 2
+- **5 Test Users** with working credentials
+- **6 Patients** for Clinic 1
+- **3 Therapy Types**: Physiotherapy, Speech Therapy, Neurological Rehab
+- **2 Rooms**: Room A & Room B
+- **5 Sample Appointments** for the next few days
 
-**Use GitHub Codespaces**
+### Test User Credentials
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Email | Password | Role | Clinic |
+|-------|----------|------|--------|
+| admin@example.com | Admin123! | System Admin | All |
+| clinic.admin@example.com | ClinicAdmin123! | Clinic Admin | Test Clinic 1 |
+| therapist.one@example.com | Therapist123! | Therapist | Test Clinic 1 |
+| receptionist@example.com | Reception123! | Receptionist | Test Clinic 1 |
+| therapist.two@example.com | Therapist2! | Therapist | Test Clinic 2 |
 
-## What technologies are used for this project?
+### Role Permissions
 
-This project is built with:
+- **System Admin**: Full access to all clinics and settings
+- **Clinic Admin**: Full access to their clinic's data
+- **Therapist**: Can view their own appointments only
+- **Receptionist**: Can view/manage all appointments in their clinic
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🛠 Technologies
 
-## How can I deploy this project?
+- **Frontend**: React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Edge Functions)
+- **Build Tool**: Vite
 
-Simply open [Lovable](https://lovable.dev/projects/41701f72-1b2e-4dee-a1f5-b4c7317f4bde) and click on Share -> Publish.
+## 📁 Project Structure
 
-## Can I connect a custom domain to my Lovable project?
+```
+src/
+├── components/       # Reusable UI components
+├── contexts/         # React contexts (Auth)
+├── pages/            # Page components
+├── types/            # TypeScript types
+└── integrations/     # Supabase client
 
-Yes, you can!
+supabase/
+├── functions/        # Edge functions
+│   └── seed-data/    # Database seeding function
+└── config.toml       # Supabase configuration
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🔐 Security
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Row Level Security (RLS) on all tables
+- Role-based access control via `user_roles` table
+- Multi-tenant data isolation by `clinic_id`
+- Secure authentication with Supabase Auth
+
+## 📚 Documentation
+
+- [Lovable Docs](https://docs.lovable.dev)
+- [Supabase Docs](https://supabase.com/docs)
