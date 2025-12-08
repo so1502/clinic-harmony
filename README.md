@@ -1,26 +1,3 @@
-# TherapyHub - Therapy Clinic Scheduling System
-
-A multi-tenant therapy clinic scheduling system with role-based access control.
-
-## 🚀 Quick Start
-
-### Seeding the Database
-
-To populate the database with test data, visit:
-
-```
-/seed
-```
-
-Or click the "Run Seed Script" button on that page. This will create:
-
-- **2 Clinics**: Test Clinic 1 & Test Clinic 2
-- **5 Test Users** with working credentials
-- **6 Patients** for Clinic 1
-- **3 Therapy Types**: Physiotherapy, Speech Therapy, Neurological Rehab
-- **2 Rooms**: Room A & Room B
-- **5 Sample Appointments** for the next few days
-
 ### Test User Credentials
 
 | Email | Password | Role | Clinic |
