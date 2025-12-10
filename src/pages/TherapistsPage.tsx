@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit, Trash2, UserCircle } from 'lucide-react';
-import { Therapist } from '@/types/database';
+import { Plus, Search, Edit, Trash2, UserCircle, Link2 } from 'lucide-react';
 import { TherapistModal } from '@/components/therapists/TherapistModal';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -40,9 +39,12 @@ export default function TherapistsPage() {
   }, [profile?.clinic_id]);
 
   useEffect(() => {
+    const query = searchQuery.toLowerCase();
     const filtered = therapists.filter(t =>
-      t.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.profiles?.full_name?.toLowerCase().includes(query) ||
+      t.profiles?.email?.toLowerCase().includes(query) ||
+      t.invite_email?.toLowerCase().includes(query) ||
+      t.specialization?.toLowerCase().includes(query)
     );
     setFilteredTherapists(filtered);
   }, [therapists, searchQuery]);
@@ -82,46 +84,107 @@ export default function TherapistsPage() {
         if (error) throw error;
         toast.success('Therapist updated');
       } else {
-        // First create the user account
-        const { data: authData, error: authError } = await supabase.auth.admin?.createUser({
-          email: data.email,
-          password: data.password,
-          email_confirm: true,
-        });
-
-        if (authError) {
-          // Fallback: user might already exist, let them know
-          toast.error('To add a therapist, they must first create an account. Then you can assign them the therapist role.');
+        if (!data.email || !data.fullName) {
+          toast.error('Name and email are required to send an invite.');
           return;
         }
 
-        // Create therapist record
-        const { error } = await supabase
-          .from('therapists')
-          .insert({
-            user_id: authData.user.id,
+        if (!supabase.auth.admin) {
+          throw new Error('Service role is required to send invites.');
+        }
+
+        // Check if user already exists by email
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', data.email)
+          .maybeSingle();
+
+        let userId = existingProfile?.id;
+        let inviteLink: string | null = null;
+
+        if (!userId) {
+          const redirectTo = `${window.location.origin}/auth`;
+          const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+            data.email,
+            {
+              data: { full_name: data.fullName },
+              redirectTo,
+            }
+          );
+
+          if (inviteError || !inviteData?.user) {
+            throw new Error(inviteError?.message || 'Failed to send invite email');
+          }
+
+          userId = inviteData.user.id;
+          inviteLink = inviteData.action_link ?? null;
+        }
+
+        // Ensure profile is linked to the clinic and updated with name
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            email: data.email,
+            full_name: data.fullName,
             clinic_id: profile.clinic_id,
-            specialization: data.specialization,
-            bio: data.bio,
-            color: data.color,
           });
-        if (error) throw error;
 
         // Assign therapist role
         await supabase
           .from('user_roles')
-          .insert({
-            user_id: authData.user.id,
+          .upsert({
+            user_id: userId,
             role: 'therapist',
           });
 
-        toast.success('Therapist created');
+        // Create therapist record with pending status until invite is accepted
+        const { error } = await supabase
+          .from('therapists')
+          .insert({
+            user_id: userId,
+            clinic_id: profile.clinic_id,
+            specialization: data.specialization,
+            bio: data.bio,
+            color: data.color,
+            status: inviteLink ? 'pending' : 'active',
+            invite_email: data.email,
+            invite_link: inviteLink,
+            invite_sent_at: new Date().toISOString(),
+          });
+        if (error) throw error;
+
+        toast.success('Invite sent to therapist', {
+          description: inviteLink
+            ? 'They will appear as pending until they accept the invite.'
+            : 'Therapist profile created.',
+        });
+
+        if (inviteLink) {
+          try {
+            await navigator.clipboard.writeText(inviteLink);
+            toast.message('Invite link copied', { description: 'You can paste it into any message.' });
+          } catch {
+            // Clipboard might be unavailable; ignore silently
+          }
+        }
       }
       setIsModalOpen(false);
       setSelectedTherapist(null);
       fetchTherapists();
     } catch (error: any) {
       toast.error(error.message || 'Failed to save therapist');
+    }
+  };
+
+  const handleCopyInvite = async (link: string | null | undefined) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Invite link copied to clipboard');
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not copy link');
     }
   };
 
@@ -183,6 +246,7 @@ export default function TherapistsPage() {
                   <TableHead>Therapist</TableHead>
                   <TableHead>Specialization</TableHead>
                   <TableHead>Color</TableHead>
+              <TableHead>Status</TableHead>
                   <TableHead>Joined</TableHead>
                   {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
                 </TableRow>
@@ -190,7 +254,7 @@ export default function TherapistsPage() {
               <TableBody>
                 {filteredTherapists.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={6} className="text-center py-12">
                       <UserCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
                         {searchQuery ? 'No therapists found' : 'No therapists yet'}
@@ -232,11 +296,33 @@ export default function TherapistsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={therapist.status === 'pending' ? 'secondary' : 'default'}>
+                            {therapist.status === 'pending' ? 'Pending invite' : 'Active'}
+                          </Badge>
+                          {therapist.status === 'pending' && therapist.invite_email && (
+                            <span className="text-xs text-muted-foreground">
+                              Sent to {therapist.invite_email}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         {format(new Date(therapist.created_at), 'PP')}
                       </TableCell>
                       {isAdmin && (
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            {therapist.status === 'pending' && therapist.invite_link && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCopyInvite(therapist.invite_link)}
+                                title="Copy invite link"
+                              >
+                                <Link2 className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

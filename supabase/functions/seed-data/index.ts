@@ -184,7 +184,9 @@ Deno.serve(async (req) => {
             clinic_id: clinicId,
             specialization: user.specialization,
             bio: `Experienced ${user.specialization} specialist with over 10 years of practice.`,
-            color: user.color
+            color: user.color,
+            status: 'active',
+            invite_email: user.email
           });
 
         if (error) {

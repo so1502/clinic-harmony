@@ -19,16 +19,22 @@ const COLORS = [
 
 export function TherapistModal({ open, onOpenChange, therapist, onSave }: TherapistModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [bio, setBio] = useState('');
   const [color, setColor] = useState(COLORS[0]);
 
   useEffect(() => {
     if (therapist) {
+      setFullName(therapist.profiles?.full_name || '');
+      setEmail(therapist.profiles?.email || therapist.invite_email || '');
       setSpecialization(therapist.specialization || '');
       setBio(therapist.bio || '');
       setColor(therapist.color || COLORS[0]);
     } else {
+      setFullName('');
+      setEmail('');
       setSpecialization('');
       setBio('');
       setColor(COLORS[0]);
@@ -38,7 +44,7 @@ export function TherapistModal({ open, onOpenChange, therapist, onSave }: Therap
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await onSave({ specialization, bio, color });
+    await onSave({ fullName, email, specialization, bio, color });
     setIsLoading(false);
   };
 
@@ -55,11 +61,34 @@ export function TherapistModal({ open, onOpenChange, therapist, onSave }: Therap
           {!therapist && (
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
-                To add a new therapist, they must first create an account using the sign-up page. 
-                Then you can assign them the therapist role from the settings.
+                Invite a therapist by entering their name and email. We'll send them an automated link to join and they will appear as pending until they accept.
               </p>
             </div>
           )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Full name</Label>
+              <Input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Therapist name"
+                required={!therapist}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="therapist@email.com"
+                required={!therapist}
+                disabled={!!therapist}
+              />
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label>Specialization</Label>
