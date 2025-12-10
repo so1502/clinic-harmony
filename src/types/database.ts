@@ -1,4 +1,5 @@
 export type AppRole = 'system_admin' | 'clinic_admin' | 'therapist' | 'receptionist';
+export type TherapistStatus = 'pending' | 'active';
 
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 
@@ -35,6 +36,11 @@ export interface Therapist {
   specialization: string | null;
   bio: string | null;
   color: string;
+  status: TherapistStatus;
+  invite_email?: string | null;
+  invite_link?: string | null;
+  invite_sent_at?: string | null;
+  invite_accepted_at?: string | null;
   created_at: string;
   updated_at: string;
   profile?: Profile;

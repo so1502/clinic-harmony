@@ -252,6 +252,11 @@ export type Database = {
           color: string | null
           created_at: string
           id: string
+          invite_accepted_at: string | null
+          invite_email: string | null
+          invite_link: string | null
+          invite_sent_at: string | null
+          status: Database["public"]["Enums"]["therapist_status"]
           specialization: string | null
           updated_at: string
           user_id: string
@@ -262,6 +267,11 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          invite_accepted_at?: string | null
+          invite_email?: string | null
+          invite_link?: string | null
+          invite_sent_at?: string | null
+          status?: Database["public"]["Enums"]["therapist_status"]
           specialization?: string | null
           updated_at?: string
           user_id: string
@@ -272,6 +282,11 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          invite_accepted_at?: string | null
+          invite_email?: string | null
+          invite_link?: string | null
+          invite_sent_at?: string | null
+          status?: Database["public"]["Enums"]["therapist_status"]
           specialization?: string | null
           updated_at?: string
           user_id?: string
@@ -369,6 +384,7 @@ export type Database = {
     }
     Enums: {
       app_role: "system_admin" | "clinic_admin" | "therapist" | "receptionist"
+      therapist_status: "active" | "pending"
       appointment_status:
         | "scheduled"
         | "confirmed"
